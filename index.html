@@ -438,6 +438,13 @@ function renderDist(){
   }).join("");
 }
 
+/* ================= Utilitas: samarkan 4 digit terakhir NIK ================= */
+function maskNip(nip){
+  const str = String(nip ?? "").trim();
+  if(str.length <= 4) return "*".repeat(str.length);
+  return str.slice(0, -4) + "****";
+}
+
 /* ================= Detail: roster pegawai per dinas ================= */
 function selectDinas(id){
   activeDinasId = id;
@@ -512,12 +519,12 @@ function renderDetail(){
       <div class="roster">
         ${roster.length ? `
         <table>
-          <thead><tr><th>Nama Pegawai</th><th>NIP</th><th>Jabatan</th><th>Status</th></tr></thead>
+          <thead><tr><th>Nama Pegawai</th><th>NIK</th><th>Nama Kepala Keluarga</th><th>Status</th></tr></thead>
           <tbody>
             ${roster.map(p => `
               <tr>
                 <td>${p.nama}</td>
-                <td class="nip">${p.nip}</td>
+                <td class="nip">${maskNip(p.nip)}</td>
                 <td>${p.jabatan}</td>
                 <td>${p.status==="sudah"
                   ? '<span class="badge done"><span class="dot"></span>Sudah terdata</span>'
