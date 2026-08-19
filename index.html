@@ -336,8 +336,7 @@ function setStatusPill(state, detail){
   if(state === "loading"){
     pill.innerHTML = `<span class="dot"></span> Memuat data dari Google Sheets…`;
   } else if(state === "ok"){
-    const jam = new Date().toLocaleTimeString("id-ID", {hour:"2-digit", minute:"2-digit"});
-    pill.innerHTML = `<span class="dot"></span> Live · diperbarui ${jam}`;
+    pill.innerHTML = `<span class="dot"></span> Data di update setiap pukul 11.00 WIB setiap harinya`;
   } else {
     pill.innerHTML = `<span class="dot" style="background:#E3958A;"></span> Gagal memuat data${detail ? " ("+detail+")" : ""} — klik untuk coba lagi`;
   }
