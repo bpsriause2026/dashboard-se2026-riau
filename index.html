@@ -6,6 +6,7 @@
 <title>Dashboard Monitoring Pendataan SE2026 — ASN Pemprov Riau</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg: #FBF3E7;
@@ -82,7 +83,7 @@
   /* ---------- KPI cards (overlapping header) ---------- */
   .kpi-wrap{
     max-width:1240px; margin:-56px auto 0; padding:0 40px; position:relative; z-index:2;
-    display:grid; grid-template-columns:repeat(4,1fr); gap:16px;
+    display:grid; grid-template-columns:repeat(5,1fr); gap:16px;
   }
   .kpi{
     background:var(--surface); border-radius:14px; padding:18px 20px; box-shadow:var(--shadow);
@@ -94,6 +95,61 @@
   .kpi .delta{ margin-top:8px; font-size:12px; color:var(--green-mid); font-weight:600;}
   .kpi .delta.warn{ color:var(--red); }
   .kpi.accent .value{ color:var(--gold); }
+  @media (max-width:1180px){ .kpi-wrap{ grid-template-columns:repeat(2,1fr); } }
+
+  .kpi.clickable{ cursor:pointer; border-color:rgba(217,119,6,0.35); position:relative; transition:box-shadow .12s ease, transform .12s ease; }
+  .kpi.clickable:hover{ box-shadow:0 10px 28px rgba(154,52,18,0.16); transform:translateY(-1px); }
+  .kpi.clickable .chev{ position:absolute; top:16px; right:16px; font-size:11px; color:var(--ink-soft); transition:transform .15s ease; }
+  .kpi.clickable.open .chev{ transform:rotate(180deg); }
+  .kpi .value.trend{ color:var(--gold); }
+  .kpi .delta.trend-pct{ color:var(--gold); background:var(--green-pale); display:inline-block; padding:1px 8px; border-radius:999px; }
+
+  /* ---------- Trend panel (penambahan pegawai terdata per hari) ---------- */
+  .trend-panel-wrap{ max-width:1240px; margin:14px auto 0; padding:0 40px; position:relative; z-index:1; }
+  .trend-panel{
+    background:var(--surface); border-radius:16px; border:1px solid var(--line); box-shadow:var(--shadow);
+    padding:20px 24px 22px; display:none;
+  }
+  .trend-panel.show{ display:block; }
+  .trend-panel .panel-head{ padding:0 0 14px; border:none; }
+  .trend-chart-wrap{ overflow-x:auto; }
+  .trend-bar-label{ font-family:'IBM Plex Mono',monospace; font-size:10px; fill:var(--ink-soft); }
+  .trend-bar-value{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; fill:var(--green-deep); font-weight:600; }
+  .trend-empty{ padding:24px; text-align:center; color:var(--ink-soft); font-size:13px; }
+
+  /* ---------- Employee search panel ---------- */
+  .emp-search-wrap{ max-width:1240px; margin:14px auto 0; padding:0 40px; position:relative; z-index:2; }
+  .emp-search-panel{
+    background:var(--surface); border-radius:16px; border:1px solid var(--line); box-shadow:var(--shadow);
+    padding:16px 22px;
+  }
+  .emp-search-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .emp-search-row .icon{ font-size:16px; flex:none; }
+  .emp-search-row input{
+    flex:1; min-width:220px; padding:10px 14px; border-radius:10px; border:1px solid var(--line);
+    background:var(--surface-2); font-family:'Inter',sans-serif; font-size:13px; color:var(--ink);
+  }
+  .emp-search-row input:focus{ outline:2px solid var(--gold); outline-offset:1px; }
+  .emp-search-results{ margin-top:12px; max-height:280px; overflow-y:auto; display:none; }
+  .emp-search-results.show{ display:block; }
+  .emp-result-row{
+    display:flex; justify-content:space-between; align-items:center; gap:10px; padding:9px 10px;
+    border-radius:10px; cursor:pointer; border:1px solid transparent;
+  }
+  .emp-result-row:hover{ background:var(--surface-2); border-color:var(--line); }
+  .emp-result-name{ font-size:13px; font-weight:600; color:var(--ink); }
+  .emp-result-sub{ font-size:11px; color:var(--ink-soft); }
+  .emp-result-row .badge{ flex:none; }
+  .emp-search-hint{ font-size:11.5px; color:var(--ink-soft); margin-top:8px; }
+  .roster tr.highlight td{ background:var(--gold-light); }
+
+  /* ---------- Download buttons ---------- */
+  .btn-download{
+    display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line); background:var(--surface-2);
+    border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:600; color:var(--green-deep); cursor:pointer;
+    white-space:nowrap;
+  }
+  .btn-download:hover{ background:var(--green-pale); border-color:var(--green-mid); }
 
   /* ---------- Body layout ---------- */
   main{ max-width:1240px; margin:0 auto; padding:36px 40px 80px; display:grid; grid-template-columns:380px 1fr; gap:24px;}
@@ -240,12 +296,37 @@
 
 <div class="kpi-wrap" id="kpiWrap"></div>
 
+<div class="trend-panel-wrap">
+  <div class="trend-panel" id="trendPanel">
+    <div class="panel-head">
+      <h2>📈 Penambahan Pegawai Terdata per Hari</h2>
+      <span class="hint">Jumlah ASN yang berpindah status menjadi "sudah terdata" pada tiap tanggal</span>
+    </div>
+    <div class="trend-chart-wrap" id="trendChartWrap"></div>
+  </div>
+</div>
+
+<div class="emp-search-wrap">
+  <div class="emp-search-panel">
+    <div class="emp-search-row">
+      <span class="icon">🔎</span>
+      <input id="empSearchInput" type="text" placeholder="Cari nama pegawai di seluruh Perangkat Daerah...">
+      <button class="btn-download" onclick="downloadExcel(null)">⬇ Unduh Excel (Semua Dinas)</button>
+    </div>
+    <div class="emp-search-hint" id="empSearchHint">Ketik nama pegawai untuk mencari di seluruh dinas — hasil akan langsung membawa Anda ke rosternya.</div>
+    <div class="emp-search-results" id="empSearchResults"></div>
+  </div>
+</div>
+
 <main>
   <!-- LEFT: daftar dinas -->
   <div class="panel">
     <div class="panel-head">
       <h2>Daftar Perangkat Daerah</h2>
       <span class="hint" id="dinasCount"></span>
+    </div>
+    <div style="padding:0 18px 4px;">
+      <button class="btn-download" style="width:100%; justify-content:center;" onclick="downloadExcel(null)">⬇ Unduh Excel Semua Dinas</button>
     </div>
     <div class="search-box"><input id="searchInput" type="text" placeholder="Cari nama dinas / badan..."></div>
     <div class="dinas-list" id="dinasList"></div>
@@ -284,6 +365,9 @@ const REFRESH_MS = 2 * 60 * 1000; // auto-refresh tiap 2 menit
 let DINAS = [];
 let activeDinasId = null;
 let rosterFilter = "all";
+let DAILY_ADDITIONS = [];
+let trendOpen = false;
+let highlightNip = null;
 
 // Google Sheets gviz endpoint tidak selalu mengirim header CORS untuk fetch() biasa,
 // jadi kita pakai JSONP (memuat lewat <script> tag) yang memang didukung resmi dan tidak kena blokir CORS.
@@ -308,6 +392,23 @@ async function fetchSheetRows(gid){
     .filter(cols => cols.some(v => v !== ""));
 }
 
+// Google Visualization API mengirim sel bertipe tanggal sebagai string literal "Date(yyyy,m,d)".
+function parseGvizDate(raw){
+  if(!raw) return null;
+  if(raw instanceof Date) return isNaN(raw) ? null : raw;
+  const s = String(raw).trim();
+  const m = s.match(/^Date\((\d+),(\d+),(\d+)/);
+  if(m) return new Date(Number(m[1]), Number(m[2]), Number(m[3]));
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+function fmtDate(d){
+  return d.toLocaleDateString("id-ID", { day:"2-digit", month:"short" });
+}
+function fmtDateKey(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
 // Kolom tab "Data Pegawai": No, NIP, Nama Lengkap, Dinas/Perangkat Daerah, Jabatan, Status Pendataan, Tanggal Pendataan, Petugas/Verifikator, Catatan
 function buildDinasFromRows(rows){
   const map = new Map();
@@ -319,15 +420,29 @@ function buildDinasFromRows(rows){
     const jabatan = String(cols[4] ?? "");
     const statusRaw = String(cols[5] ?? "").toLowerCase();
     const status = statusRaw.includes("sudah") ? "sudah" : "belum";
+    const tanggal = status === "sudah" ? parseGvizDate(cols[6]) : null;
     if(!map.has(dinasName)){
       map.set(dinasName, { id: "d" + map.size, nama: dinasName, pegawai: [] });
     }
-    map.get(dinasName).pegawai.push({ nama, nip, jabatan, status });
+    map.get(dinasName).pegawai.push({ nama, nip, jabatan, status, tanggal });
   });
   return Array.from(map.values())
     .map(d => ({ ...d, totalASN: d.pegawai.length, sudah: d.pegawai.filter(p=>p.status==="sudah").length }))
     .filter(d => d.totalASN > 0)
     .sort((a,b) => (b.sudah/b.totalASN) - (a.sudah/a.totalASN));
+}
+
+// Agregasi penambahan pegawai "sudah terdata" per tanggal, di seluruh dinas.
+function computeDailyAdditions(){
+  const map = new Map();
+  DINAS.forEach(d => d.pegawai.forEach(p => {
+    if(p.status === "sudah" && p.tanggal){
+      const key = fmtDateKey(p.tanggal);
+      if(!map.has(key)) map.set(key, { key, date: p.tanggal, count: 0 });
+      map.get(key).count += 1;
+    }
+  }));
+  return Array.from(map.values()).sort((a,b) => a.date - b.date);
 }
 
 function setStatusPill(state, detail){
@@ -365,6 +480,12 @@ function renderKPI(){
   const overallPct = ((totalSudah/totalASN)*100).toFixed(1);
   const topDinas = DINAS[0];
 
+  DAILY_ADDITIONS = computeDailyAdditions();
+  const lastDay = DAILY_ADDITIONS[DAILY_ADDITIONS.length - 1];
+  const penambahanJumlah = lastDay ? lastDay.count : 0;
+  const penambahanPct = totalASN ? ((penambahanJumlah/totalASN)*100).toFixed(1) : "0.0";
+  const penambahanTanggal = lastDay ? fmtDate(lastDay.date) : null;
+
   const kpis = [
     { label:"Total ASN Terdaftar", value: totalASN.toLocaleString("id-ID"), delta: `${DINAS.length} perangkat daerah`, cls:"" },
     { label:"Sudah Terdata", value: totalSudah.toLocaleString("id-ID"), delta: `${overallPct}% dari total ASN`, cls:"" },
@@ -378,7 +499,14 @@ function renderKPI(){
       <div class="value" style="${k.small?'font-size:19px;line-height:1.25;':''}">${k.value}</div>
       <div class="delta ${k.cls}">${k.delta}</div>
     </div>
-  `).join("");
+  `).join("") + `
+    <div class="kpi clickable" id="trendKpiCard" onclick="toggleTrendChart()">
+      <span class="chev">▾</span>
+      <div class="label">Penambahan Pegawai Terdata</div>
+      <div class="value trend">+${penambahanJumlah.toLocaleString("id-ID")}</div>
+      <div class="delta trend-pct">${penambahanPct}%${penambahanTanggal ? " · " + penambahanTanggal : ""}</div>
+    </div>
+  `;
 }
 
 /* ================= RENDER: daftar dinas kiri ================= */
@@ -437,6 +565,132 @@ function renderDist(){
   }).join("");
 }
 
+/* ================= Trend: penambahan pegawai terdata per hari ================= */
+function toggleTrendChart(){
+  trendOpen = !trendOpen;
+  const panel = document.getElementById("trendPanel");
+  const card = document.getElementById("trendKpiCard");
+  panel.classList.toggle("show", trendOpen);
+  if(card) card.classList.toggle("open", trendOpen);
+  if(trendOpen) renderTrendChart();
+}
+
+function renderTrendChart(){
+  const wrap = document.getElementById("trendChartWrap");
+  if(!DAILY_ADDITIONS.length){
+    wrap.innerHTML = `<div class="trend-empty">Belum ada data tanggal pendataan yang bisa dihitung.</div>`;
+    return;
+  }
+  const data = DAILY_ADDITIONS.slice(-21); // 21 hari terakhir supaya tetap terbaca
+  const maxCount = Math.max(...data.map(d => d.count), 1);
+  const barW = 34, gap = 14, chartH = 180, leftPad = 6, topPad = 24;
+  const chartW = data.length * (barW + gap) + leftPad;
+  const bars = data.map((d, i) => {
+    const h = Math.max((d.count / maxCount) * (chartH - topPad), d.count > 0 ? 4 : 0);
+    const x = leftPad + i * (barW + gap);
+    const y = chartH - h;
+    return `
+      <text class="trend-bar-value" x="${x + barW/2}" y="${y - 6}" text-anchor="middle">${d.count}</text>
+      <rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="5" fill="var(--green-mid)"></rect>
+      <text class="trend-bar-label" x="${x + barW/2}" y="${chartH + 16}" text-anchor="middle">${fmtDate(d.date)}</text>
+    `;
+  }).join("");
+  wrap.innerHTML = `
+    <svg width="${chartW}" height="${chartH + 30}" viewBox="0 0 ${chartW} ${chartH + 30}" xmlns="http://www.w3.org/2000/svg">
+      ${bars}
+    </svg>
+  `;
+}
+
+/* ================= Download Excel: sudah / belum terdata, per dinas atau semua ================= */
+function downloadExcel(dinasId){
+  if(typeof XLSX === "undefined"){
+    alert("Pustaka Excel belum termuat, silakan coba lagi sebentar lagi.");
+    return;
+  }
+  const scope = dinasId ? DINAS.filter(d => d.id === dinasId) : DINAS;
+  if(!scope.length){ alert("Tidak ada data untuk diunduh."); return; }
+
+  const toRows = (status) => {
+    const rows = [];
+    scope.forEach(d => {
+      d.pegawai.filter(p => p.status === status).forEach(p => {
+        rows.push({
+          "Dinas / Perangkat Daerah": d.nama,
+          "Nama Pegawai": p.nama,
+          "NIP": maskNip(p.nip),
+          "Nama Kepala Keluarga": p.jabatan,
+          "Status": status === "sudah" ? "Sudah Terdata" : "Belum Terdata",
+          "Tanggal Pendataan": p.tanggal ? fmtDate(p.tanggal) : ""
+        });
+      });
+    });
+    return rows;
+  };
+
+  const wb = XLSX.utils.book_new();
+  const sudahRows = toRows("sudah");
+  const belumRows = toRows("belum");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sudahRows.length ? sudahRows : [{"Info":"Tidak ada pegawai sudah terdata"}]), "Sudah Terdata");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(belumRows.length ? belumRows : [{"Info":"Tidak ada pegawai belum terdata"}]), "Belum Terdata");
+
+  const scopeLabel = dinasId ? scope[0].nama.replace(/[^a-z0-9]+/gi, "_").slice(0, 40) : "Semua_Dinas";
+  const todayStr = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `SE2026_ASN_${scopeLabel}_${todayStr}.xlsx`);
+}
+
+/* ================= Pencarian nama pegawai lintas dinas ================= */
+function searchEmployees(term){
+  const q = term.trim().toLowerCase();
+  const resultsEl = document.getElementById("empSearchResults");
+  const hintEl = document.getElementById("empSearchHint");
+  if(q.length < 2){
+    resultsEl.classList.remove("show");
+    resultsEl.innerHTML = "";
+    hintEl.style.display = "block";
+    return;
+  }
+  hintEl.style.display = "none";
+  const matches = [];
+  DINAS.forEach(d => {
+    d.pegawai.forEach(p => {
+      if(p.nama.toLowerCase().includes(q)){
+        matches.push({ ...p, dinasId: d.id, dinasNama: d.nama });
+      }
+    });
+  });
+  matches.sort((a,b) => a.nama.localeCompare(b.nama));
+  const shown = matches.slice(0, 30);
+
+  if(!shown.length){
+    resultsEl.innerHTML = `<div class="trend-empty" style="padding:14px;">Tidak ditemukan pegawai dengan nama tersebut.</div>`;
+    resultsEl.classList.add("show");
+    return;
+  }
+
+  resultsEl.innerHTML = shown.map(p => `
+    <div class="emp-result-row" onclick='goToEmployee(${JSON.stringify(p.dinasId)}, ${JSON.stringify(p.nip)})'>
+      <div>
+        <div class="emp-result-name">${p.nama}</div>
+        <div class="emp-result-sub">${p.dinasNama}${p.jabatan ? " · " + p.jabatan : ""}</div>
+      </div>
+      ${p.status === "sudah"
+        ? '<span class="badge done"><span class="dot"></span>Sudah terdata</span>'
+        : '<span class="badge pending"><span class="dot"></span>Belum terdata</span>'}
+    </div>`).join("") +
+    (matches.length > shown.length ? `<div class="emp-search-hint">Menampilkan 30 dari ${matches.length} hasil — perhalus kata kunci pencarian.</div>` : "");
+  resultsEl.classList.add("show");
+}
+
+function goToEmployee(dinasId, nip){
+  highlightNip = nip;
+  rosterFilter = "all";
+  activeDinasId = dinasId;
+  renderDinasList(document.getElementById("searchInput").value);
+  renderDetail();
+  window.scrollTo({top: document.getElementById("rightStack").offsetTop - 20, behavior:"smooth"});
+}
+
 /* ================= Utilitas: samarkan 4 digit terakhir NIK ================= */
 function maskNip(nip){
   const str = String(nip ?? "").trim();
@@ -448,6 +702,7 @@ function maskNip(nip){
 function selectDinas(id){
   activeDinasId = id;
   rosterFilter = "all";
+  highlightNip = null;
   renderDinasList(document.getElementById("searchInput").value);
   renderDetail();
   window.scrollTo({top: document.getElementById("rightStack").offsetTop - 20, behavior:"smooth"});
@@ -455,6 +710,7 @@ function selectDinas(id){
 
 function closeDinas(){
   activeDinasId = null;
+  highlightNip = null;
   renderDinasList(document.getElementById("searchInput").value);
   renderDetail();
 }
@@ -508,6 +764,7 @@ function renderDetail(){
         <div class="ring-wrap">
           <span class="badge done"><span class="dot"></span>${d.sudah} sudah</span>
           <span class="badge pending"><span class="dot"></span>${belum} belum</span>
+          <button class="btn-download" onclick="downloadExcel('${d.id}')">⬇ Unduh Excel Dinas Ini</button>
         </div>
       </div>
       <div class="status-toggle">
@@ -521,7 +778,7 @@ function renderDetail(){
           <thead><tr><th>Nama Pegawai</th><th>NIK</th><th>Nama Kepala Keluarga</th><th>Status</th></tr></thead>
           <tbody>
             ${roster.map(p => `
-              <tr>
+              <tr class="${highlightNip && p.nip===highlightNip ? 'highlight' : ''}">
                 <td>${p.nama}</td>
                 <td class="nip">${maskNip(p.nip)}</td>
                 <td>${p.jabatan}</td>
@@ -533,11 +790,19 @@ function renderDetail(){
         </table>` : `<div class="empty-state"><div class="icon">📋</div>Tidak ada pegawai pada kategori ini.</div>`}
       </div>
     </div>`;
+
+  if(highlightNip){
+    const row = document.querySelector(".roster tr.highlight");
+    if(row) setTimeout(() => row.scrollIntoView({block:"center", behavior:"smooth"}), 150);
+  }
 }
 
 /* ================= Search ================= */
 document.getElementById("searchInput").addEventListener("input", (e) => {
   renderDinasList(e.target.value);
+});
+document.getElementById("empSearchInput").addEventListener("input", (e) => {
+  searchEmployees(e.target.value);
 });
 
 /* ================= Init ================= */
